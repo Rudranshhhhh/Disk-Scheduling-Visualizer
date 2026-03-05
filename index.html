@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disk Scheduling Algorithm Visualizer</title>
+    <meta name="description"
+        content="Interactive dashboard to visualize and compare FCFS, SSTF, and SCAN disk scheduling algorithms. An educational tool for Operating Systems concepts.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Hero Header -->
+    <header class="hero">
+        <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
+            <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+        </button>
+        <div class="hero-bg-grid"></div>
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                Operating Systems
+            </div>
+            <h1>Disk Scheduling<br><span class="hero-highlight">Visualizer</span></h1>
+            <p class="hero-subtitle">Step through FCFS, SSTF, and SCAN — watch the disk head move, understand every
+                decision, and compare algorithm efficiency in real time.</p>
+            <div class="hero-chips">
+                <span class="chip fcfs-chip">FCFS</span>
+                <span class="chip-sep">·</span>
+                <span class="chip sstf-chip">SSTF</span>
+                <span class="chip-sep">·</span>
+                <span class="chip scan-chip">SCAN</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- Configuration Panel -->
+        <section class="config-panel" id="config-panel">
+            <div class="panel-header">
+                <div class="panel-title-row">
+                    <h2>Configuration</h2>
+                    <span class="panel-step-badge">Step 1</span>
+                </div>
+                <p class="panel-desc">Set up disk parameters and choose algorithms to simulate.</p>
+            </div>
+
+            <div class="config-grid">
+                <div class="input-group full-width">
+                    <label for="request-input">Disk Request Queue</label>
+                    <input type="text" id="request-input" placeholder="e.g. 98, 183, 37, 122, 14, 124, 65, 67"
+                        autocomplete="off">
+                    <span class="input-hint">Enter cylinder numbers separated by commas</span>
+                </div>
+
+                <div class="input-group">
+                    <label for="head-input">Initial Head Position</label>
+                    <input type="number" id="head-input" placeholder="e.g. 53" min="0" autocomplete="off">
+                </div>
+
+                <div class="input-group">
+                    <label for="disk-size-input">Disk Size (Cylinders)</label>
+                    <input type="number" id="disk-size-input" placeholder="e.g. 200" min="1" value="200"
+                        autocomplete="off">
+                </div>
+
+                <div class="input-group">
+                    <label for="direction-select">SCAN Direction</label>
+                    <select id="direction-select">
+                        <option value="left">Left (toward 0)</option>
+                        <option value="right" selected>Right (toward max)</option>
+                    </select>
+                </div>
+
+                <div class="input-group algorithm-selection">
+                    <label>Algorithms to Compare</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label" for="algo-fcfs">
+                            <input type="checkbox" id="algo-fcfs" checked>
+                            <span class="checkmark"></span>
+                            <span class="algo-tag fcfs-tag">FCFS</span>
+                        </label>
+                        <label class="checkbox-label" for="algo-sstf">
+                            <input type="checkbox" id="algo-sstf" checked>
+                            <span class="checkmark"></span>
+                            <span class="algo-tag sstf-tag">SSTF</span>
+                        </label>
+                        <label class="checkbox-label" for="algo-scan">
+                            <input type="checkbox" id="algo-scan" checked>
+                            <span class="checkmark"></span>
+                            <span class="algo-tag scan-tag">SCAN</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button class="btn btn-primary" id="visualize-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Visualize
+                </button>
+                <button class="btn btn-secondary" id="sample-btn">Load Sample</button>
+                <button class="btn btn-ghost" id="clear-btn">Clear</button>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section hidden" id="results-section">
+
+            <!-- Metrics Cards -->
+            <div class="metrics-row" id="metrics-row"></div>
+
+            <!-- Visualization Panel -->
+            <div class="viz-panel">
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <h2>Head Movement Visualization</h2>
+                        <!-- View Toggle Tabs -->
+                        <div class="view-tabs" id="view-tabs">
+                            <button class="view-tab active" data-view="path">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg>
+                                Path
+                            </button>
+                            <button class="view-tab" data-view="seeks">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+                                </svg>
+                                Per-Step Seeks
+                            </button>
+                            <button class="view-tab" data-view="cumulative">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                </svg>
+                                Cumulative
+                            </button>
+                        </div>
+                    </div>
+                    <p class="panel-desc" id="view-desc">Each line traces the disk head's path across cylinders over
+                        time.</p>
+                </div>
+
+                <div class="canvas-wrapper">
+                    <canvas id="viz-canvas"></canvas>
+                    <!-- Animated head cursor overlay -->
+                    <div class="head-cursors" id="head-cursors"></div>
+                </div>
+
+                <!-- Animation Controls -->
+                <div class="anim-controls" id="anim-controls">
+                    <button class="anim-btn" id="btn-restart" title="Restart">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 .49-3.51"></path>
+                        </svg>
+                    </button>
+                    <button class="anim-btn" id="btn-prev-step" title="Previous Step">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <button class="anim-btn anim-btn-play" id="btn-play-pause">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" id="play-icon">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span id="play-label">Play</span>
+                    </button>
+                    <button class="anim-btn" id="btn-next-step" title="Next Step">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+
+                    <div class="anim-slider-group">
+                        <input type="range" id="step-slider" min="0" value="0" class="step-slider">
+                    </div>
+
+                    <span class="step-counter" id="step-counter">Step 0 / 0</span>
+
+                    <div class="speed-group">
+                        <span class="speed-label">Speed</span>
+                        <select id="speed-select" class="speed-select">
+                            <option value="900">Slow</option>
+                            <option value="450" selected>Normal</option>
+                            <option value="180">Fast</option>
+                            <option value="60">Turbo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step Explanation Panel -->
+                <div class="step-explanation-panel" id="step-explanation">
+                    <div class="explanation-placeholder">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        Press <strong>Play</strong> or step through to see why each algorithm picks its next cylinder.
+                    </div>
+                </div>
+
+                <div class="legend" id="legend"></div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="comparison-panel">
+                <div class="panel-header">
+                    <h2>Algorithm Comparison</h2>
+                    <p class="panel-desc">Side-by-side performance metrics for each algorithm.</p>
+                </div>
+                <div class="table-wrapper">
+                    <table id="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Algorithm</th>
+                                <th>Total Movement</th>
+                                <th>Avg Seek Time</th>
+                                <th>vs. FCFS</th>
+                                <th>Request Order</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Step-by-step breakdown -->
+            <div class="breakdown-panel">
+                <div class="panel-header">
+                    <h2>Step-by-Step Breakdown</h2>
+                    <p class="panel-desc">Detailed movement trace for each algorithm. Large jumps are highlighted in
+                        red.</p>
+                </div>
+                <div class="breakdown-grid" id="breakdown-grid"></div>
+            </div>
+
+            <!-- Starvation Analysis (for SSTF) -->
+            <div class="starvation-panel hidden" id="starvation-panel">
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <h2>SSTF Starvation Analysis</h2>
+                        <span class="warning-badge">⚠ Fairness Risk</span>
+                    </div>
+                    <p class="panel-desc">How many steps each request had to wait before being served. Long waits =
+                        starvation risk.</p>
+                </div>
+                <div id="starvation-chart"></div>
+            </div>
+
+            <!-- Efficiency Radar Chart -->
+            <div class="radar-panel">
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <h2>Efficiency Radar</h2>
+                        <span class="panel-step-badge">Multi-Axis</span>
+                    </div>
+                    <p class="panel-desc">Compare algorithms across 4 performance dimensions. Larger area = better
+                        overall
+                        performance.</p>
+                </div>
+                <div class="radar-canvas-wrapper">
+                    <canvas id="radar-canvas" width="420" height="420"></canvas>
+                </div>
+            </div>
+
+            <!-- Disk Heatmap -->
+            <div class="heatmap-panel">
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <h2>Disk Region Heatmap</h2>
+                        <span class="panel-step-badge">Traffic</span>
+                    </div>
+                    <p class="panel-desc">Which cylinder regions see the most head traffic? Hotter colors = more visits.
+                    </p>
+                </div>
+                <div class="heatmap-grid" id="heatmap-grid"></div>
+                <div class="heatmap-scale">
+                    <span>Low</span>
+                    <div class="heatmap-scale-bar"></div>
+                    <span>High</span>
+                </div>
+            </div>
+
+            <!-- Animated Disk Arm -->
+            <div class="disk-arm-panel">
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <h2>Animated Disk Arm</h2>
+                        <span class="panel-step-badge">Interactive</span>
+                    </div>
+                    <p class="panel-desc">Watch the disk arm sweep across tracks on a platter. Uses the same step
+                        controls
+                        above.</p>
+                </div>
+                <div class="disk-arm-controls" id="disk-arm-controls"></div>
+                <div class="disk-arm-wrapper">
+                    <canvas id="disk-arm-canvas" width="460" height="460"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Algorithm Reference -->
+        <section class="reference-section">
+            <div class="panel-header">
+                <h2>Algorithm Reference</h2>
+                <p class="panel-desc">How each scheduling strategy works under the hood.</p>
+            </div>
+            <div class="accordion-group">
+                <details class="accordion" open>
+                    <summary>
+                        <span class="algo-tag fcfs-tag">FCFS</span>
+                        First Come First Serve
+                        <svg class="accordion-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="accordion-content">
+                        <p>The simplest disk scheduling algorithm. Requests are serviced in the exact order they arrive
+                            in the queue. While fair and easy to implement, FCFS can result in large total head
+                            movements.</p>
+                        <div class="algo-properties">
+                            <div class="prop prop-good"><span class="prop-icon">✓</span> <strong>Fair</strong> — No
+                                starvation</div>
+                            <div class="prop prop-bad"><span class="prop-icon">✗</span> <strong>Inefficient</strong> —
+                                No optimization</div>
+                            <div class="prop prop-neutral"><span class="prop-icon">→</span> <strong>Best for:</strong>
+                                Light or ordered workloads</div>
+                        </div>
+                        <div class="pseudocode">
+                            <div class="pseudocode-title">Pseudocode</div>
+                            <pre>for each request in queue (in order):
+    move head to request
+    record distance moved</pre>
+                        </div>
+                    </div>
+                </details>
+                <details class="accordion">
+                    <summary>
+                        <span class="algo-tag sstf-tag">SSTF</span>
+                        Shortest Seek Time First
+                        <svg class="accordion-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="accordion-content">
+                        <p>Selects the request closest to the current head position at each step. This greedy approach
+                            significantly reduces total movement, but requests far from the action can wait indefinitely
+                            — a problem called <strong>starvation</strong>.</p>
+                        <div class="algo-properties">
+                            <div class="prop prop-bad"><span class="prop-icon">✗</span> <strong>Starvation risk</strong>
+                                for distant requests</div>
+                            <div class="prop prop-good"><span class="prop-icon">✓</span> <strong>Highly
+                                    efficient</strong> — minimizes seeks</div>
+                            <div class="prop prop-neutral"><span class="prop-icon">→</span> <strong>Best for:</strong>
+                                Throughput-heavy systems</div>
+                        </div>
+                        <div class="pseudocode">
+                            <div class="pseudocode-title">Pseudocode</div>
+                            <pre>while pending requests exist:
+    find request closest to head
+    move head there
+    record distance moved</pre>
+                        </div>
+                    </div>
+                </details>
+                <details class="accordion">
+                    <summary>
+                        <span class="algo-tag scan-tag">SCAN</span>
+                        Elevator Algorithm
+                        <svg class="accordion-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="accordion-content">
+                        <p>The head moves in one direction, servicing all requests along the way, travels to the disk
+                            boundary, then reverses and services the other side. Like an elevator — bounded waiting time
+                            with good throughput.</p>
+                        <div class="algo-properties">
+                            <div class="prop prop-good"><span class="prop-icon">✓</span> <strong>Bounded wait</strong> —
+                                no starvation</div>
+                            <div class="prop prop-good"><span class="prop-icon">✓</span> <strong>High
+                                    throughput</strong></div>
+                            <div class="prop prop-neutral"><span class="prop-icon">→</span> <strong>Best for:</strong>
+                                General-purpose scheduling</div>
+                        </div>
+                        <div class="pseudocode">
+                            <div class="pseudocode-title">Pseudocode</div>
+                            <pre>move in chosen direction, service requests
+when boundary reached: reverse direction
+continue until all requests served</pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Disk Scheduling Algorithm Visualizer &mdash; Operating Systems PBL Project</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
