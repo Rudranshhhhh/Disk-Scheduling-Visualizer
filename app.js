@@ -7,6 +7,7 @@ const requestInput = document.getElementById('request-input');
 const headInput = document.getElementById('head-input');
 const diskSizeInput = document.getElementById('disk-size-input');
 const directionSelect = document.getElementById('direction-select');
+const boundaryToggle = document.getElementById('boundary-toggle');
 const algoFCFS = document.getElementById('algo-fcfs');
 const algoSSTF = document.getElementById('algo-sstf');
 const algoSCAN = document.getElementById('algo-scan');
@@ -176,13 +177,12 @@ function sstf(requests, head) {
         stepNum++;
     }
 
-    // Build wait-time map: cylinder → steps waited
+    // Build wait-time map: index → steps waited (keyed by index to handle duplicate cylinder values)
     const waitMap = {};
     requests.forEach((r, i) => {
-        // find when it was served
         for (let s = 1; s < order.length; s++) {
-            if (order[s] === r) {
-                waitMap[r] = s - 1; // steps before it was served (approximate)
+            if (order[s] === r && !(i in waitMap)) {  // first match wins
+                waitMap[i] = s - 1;
                 break;
             }
         }
@@ -199,7 +199,7 @@ function sstf(requests, head) {
     };
 }
 
-function scan(requests, head, diskSize, direction) {
+function scan(requests, head, diskSize, direction, travelToBoundary = true) {
     const sorted = [...requests].sort((a, b) => a - b);
     const left = sorted.filter(r => r < head);
     const right = sorted.filter(r => r >= head);
@@ -230,7 +230,7 @@ function scan(requests, head, diskSize, direction) {
         for (const r of right) {
             addStep(r, `Sweeping <strong>RIGHT →</strong> — cylinder <strong>${r}</strong> is the next request in our path.`);
         }
-        if (current !== diskSize - 1) {
+        if (travelToBoundary && current !== diskSize - 1) {
             addStep(diskSize - 1,
                 `No more right-side requests. Travelling to disk boundary (<strong>${diskSize - 1}</strong>).`,
                 `SCAN must reach the boundary before reversing. This guarantees bounded waiting — no request waits more than one full sweep.`
@@ -243,7 +243,7 @@ function scan(requests, head, diskSize, direction) {
         for (let i = left.length - 1; i >= 0; i--) {
             addStep(left[i], `Sweeping <strong>← LEFT</strong> — cylinder <strong>${left[i]}</strong> is the next request in our path.`);
         }
-        if (current !== 0) {
+        if (travelToBoundary && current !== 0) {
             addStep(0,
                 `No more left-side requests. Travelling to disk boundary (<strong>0</strong>).`,
                 `SCAN must reach the boundary before reversing. This guarantees bounded waiting — no request waits more than one full sweep.`
@@ -275,6 +275,7 @@ function parseInput() {
 
     if (!rawRequests) throw new Error('Please enter a disk request queue.');
     if (isNaN(headPos) || headPos < 0) throw new Error('Please enter a valid initial head position (≥ 0).');
+    if (headInput.value.trim() !== String(headPos)) throw new Error('Head position must be a whole number (no decimals).');
     if (isNaN(diskSize) || diskSize < 1) throw new Error('Please enter a valid disk size (≥ 1).');
 
     const requests = rawRequests.split(',').map(s => {
@@ -285,6 +286,10 @@ function parseInput() {
     });
 
     if (headPos >= diskSize) throw new Error(`Head position ${headPos} must be less than disk size ${diskSize}.`);
+
+    if (requests.length > 30) {
+        showToast(`⚠ Large queue (${requests.length} requests) — chart labels may overlap. Consider ≤ 30 for best readability.`);
+    }
 
     return { requests, headPos, diskSize, direction };
 }
@@ -328,7 +333,7 @@ function drawPathView(results, diskSize, upToStep) {
     const plotH = height - pad.top - pad.bottom;
 
     // Background
-    ctx.fillStyle = '#0a1628';
+    ctx.fillStyle = getCanvasBg();
     ctx.fillRect(0, 0, width, height);
 
     const maxSteps = Math.max(...results.map(r => r.sequence.length));
@@ -467,7 +472,7 @@ function drawSeeksChart(results, upToStep) {
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
 
-    ctx.fillStyle = '#0a1628';
+    ctx.fillStyle = getCanvasBg();
     ctx.fillRect(0, 0, width, height);
 
     if (showSteps === 0) {
@@ -568,7 +573,7 @@ function drawCumulativeChart(results, upToStep) {
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
 
-    ctx.fillStyle = '#0a1628';
+    ctx.fillStyle = getCanvasBg();
     ctx.fillRect(0, 0, width, height);
 
     const maxTotal = Math.max(...results.map(r => r.totalMovement), 1);
@@ -748,11 +753,13 @@ function drawRadarChart(results) {
     });
 
     // Normalize each axis: invert so lower = better = larger radius
+    // When only one algorithm is selected, use fixed baselines so the polygon doesn't collapse
+    const isSingleAlgo = results.length === 1;
     const maxVals = {
-        totalMovement: Math.max(...metrics.map(m => m.totalMovement), 1),
-        avgSeek: Math.max(...metrics.map(m => m.avgSeek), 1),
-        maxSeek: Math.max(...metrics.map(m => m.maxSeek), 1),
-        variance: Math.max(...metrics.map(m => m.variance), 1),
+        totalMovement: isSingleAlgo ? metrics[0].totalMovement * 2 : Math.max(...metrics.map(m => m.totalMovement), 1),
+        avgSeek: isSingleAlgo ? metrics[0].avgSeek * 2 : Math.max(...metrics.map(m => m.avgSeek), 1),
+        maxSeek: isSingleAlgo ? metrics[0].maxSeek * 2 : Math.max(...metrics.map(m => m.maxSeek), 1),
+        variance: isSingleAlgo ? metrics[0].variance * 2 : Math.max(...metrics.map(m => m.variance), 1),
     };
 
     const normalized = metrics.map(m => [
@@ -781,6 +788,15 @@ function drawRadarChart(results) {
 
     // Draw axis lines and labels
     const labelColor = isLight ? '#4a5068' : '#6b7280';
+
+    // Single-algorithm note
+    if (isSingleAlgo) {
+        ctx.fillStyle = labelColor;
+        ctx.font = '10px "Space Grotesk", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Single algorithm — shown relative to a fixed baseline', cx, size - 36);
+    }
+
     for (let i = 0; i < numAxes; i++) {
         const angle = startAngle + i * angleStep;
         const x = cx + maxR * Math.cos(angle);
@@ -977,10 +993,6 @@ function drawDiskArm(results, diskSize, upToStep) {
     allRequests.forEach(cyl => {
         const frac = cyl / Math.max(diskSize - 1, 1);
         const r = innerR + frac * (outerR - innerR);
-        const angle = -Math.PI / 2 + (cyl / Math.max(diskSize - 1, 1)) * Math.PI * 1.6 - Math.PI * 0.3;
-        const x = cx + r * Math.cos(angle) * 0.5 + (r * 0.5) * Math.cos(angle + 0.3);
-        const y = cy + r * Math.sin(angle) * 0.5 + (r * 0.5) * Math.sin(angle + 0.3);
-        // Simplified: just use the radius for position on a random-ish angle
         const dotAngle = (cyl / Math.max(diskSize - 1, 1)) * Math.PI * 2 - Math.PI / 2;
         const dx = cx + r * Math.cos(dotAngle);
         const dy = cy + r * Math.sin(dotAngle);
@@ -1004,18 +1016,19 @@ function drawDiskArm(results, diskSize, upToStep) {
         }
     });
 
-    // Draw the arm
+    // Draw the arm — rotates to point at the current request's position on the platter
     if (stepsToShow > 0) {
         const currentCyl = result.sequence[stepsToShow - 1];
         const frac = currentCyl / Math.max(diskSize - 1, 1);
         const armR = innerR + frac * (outerR - innerR);
-        const armAngle = -Math.PI / 2; // arm always points up, length varies
+        // Rotate arm to match the dotAngle used for placing request dots
+        const armAngle = frac * Math.PI * 2 - Math.PI / 2;
 
-        // Arm base (pivot at bottom)
+        // Arm base (pivot at center)
         const pivotX = cx;
-        const pivotY = cy + outerR + 30;
-        const tipX = cx;
-        const tipY = cy - armR;
+        const pivotY = cy;
+        const tipX = cx + armR * Math.cos(armAngle);
+        const tipY = cy + armR * Math.sin(armAngle);
 
         // Arm shadow
         ctx.beginPath();
@@ -1268,7 +1281,7 @@ function renderStarvationAnalysis(results, requests) {
     const maxWait = Math.max(...Object.values(sstfResult.waitMap), 1);
 
     const barsHTML = requests.map((r, i) => {
-        const waitSteps = sstfResult.waitMap[r] ?? 0;
+        const waitSteps = sstfResult.waitMap[i] ?? 0;
         const pct = Math.round((waitSteps / maxWait) * 100);
         const isHigh = waitSteps > (maxWait * 0.6);
         const isMed = waitSteps > (maxWait * 0.3) && !isHigh;
@@ -1313,7 +1326,7 @@ function runVisualization() {
     const results = [];
     if (selectedAlgos.includes('FCFS')) results.push(fcfs(requests, headPos));
     if (selectedAlgos.includes('SSTF')) results.push(sstf(requests, headPos));
-    if (selectedAlgos.includes('SCAN')) results.push(scan(requests, headPos, diskSize, direction));
+    if (selectedAlgos.includes('SCAN')) results.push(scan(requests, headPos, diskSize, direction, boundaryToggle.checked));
 
     // Store in animation state
     anim.results = results;
