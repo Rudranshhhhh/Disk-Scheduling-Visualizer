@@ -1321,7 +1321,7 @@ function runVisualization() {
     if (algoSSTF.checked) selectedAlgos.push('SSTF');
     if (algoSCAN.checked) selectedAlgos.push('SCAN');
 
-    if (selectedAlgos.length === 0) { showToast('Please select at least one algorithm.'); return; }
+    if (selectedAlgos.length < 2) { showToast('Please select at least 2 algorithms to compare.'); return; }
 
     const results = [];
     if (selectedAlgos.includes('FCFS')) results.push(fcfs(requests, headPos));
