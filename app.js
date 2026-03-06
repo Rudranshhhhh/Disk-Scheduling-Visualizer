@@ -1442,3 +1442,69 @@ window.addEventListener('resize', () => {
         }
     }, 200);
 });
+
+// ── Download Data ────────────────────────────────────────────
+
+function triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+document.getElementById('download-csv-btn').addEventListener('click', () => {
+    if (anim.results.length === 0) { showToast('Run a visualization first.'); return; }
+
+    let csv = 'Disk Scheduling Algorithm Comparison\n';
+    csv += `Disk Size,${anim.diskSize}\n`;
+    csv += `Head Position,${anim.results[0].sequence[0]}\n`;
+    csv += `Request Queue,"${anim.requests.join(', ')}"\n\n`;
+
+    // Summary table
+    csv += 'Algorithm,Total Movement,Avg Seek Time,Max Seek Distance,Sequence\n';
+    anim.results.forEach(r => {
+        const maxSeek = Math.max(...r.movements.map(m => m.distance));
+        csv += `${r.name},${r.totalMovement},${r.avgSeekTime},${maxSeek},"${r.sequence.join(' → ')}"\n`;
+    });
+
+    // Per-step breakdown
+    csv += '\nStep-by-Step Breakdown\n';
+    csv += 'Algorithm,Step,From,To,Distance\n';
+    anim.results.forEach(r => {
+        r.movements.forEach((m, i) => {
+            csv += `${r.name},${i + 1},${m.from},${m.to},${m.distance}\n`;
+        });
+    });
+
+    triggerDownload(csv, 'disk_scheduling_results.csv', 'text/csv');
+    showToast('CSV downloaded!');
+});
+
+document.getElementById('download-json-btn').addEventListener('click', () => {
+    if (anim.results.length === 0) { showToast('Run a visualization first.'); return; }
+
+    const data = {
+        config: {
+            diskSize: anim.diskSize,
+            headPosition: anim.results[0].sequence[0],
+            requestQueue: anim.requests,
+        },
+        results: anim.results.map(r => ({
+            algorithm: r.name,
+            totalMovement: r.totalMovement,
+            avgSeekTime: parseFloat(r.avgSeekTime),
+            maxSeekDistance: Math.max(...r.movements.map(m => m.distance)),
+            sequence: r.sequence,
+            movements: r.movements,
+        })),
+    };
+
+    triggerDownload(JSON.stringify(data, null, 2), 'disk_scheduling_results.json', 'application/json');
+    showToast('JSON downloaded!');
+});
+
